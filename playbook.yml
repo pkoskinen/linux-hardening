@@ -1,0 +1,8 @@
+---
+
+- hosts: all
+  become: true
+  gather_facts: true
+  roles:
+    - hardening-logging
+

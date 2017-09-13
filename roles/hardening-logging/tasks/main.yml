@@ -1,0 +1,97 @@
+---
+
+- name: Install auditd
+  package: name=audit state=latest
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+- name: Install auditd
+  package: name=auditd state=latest
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+
+- name: Log file size
+  lineinfile: name="/etc/audit/auditd.conf" regexp="^max_log_file = \d" line="max_log_file = {{ auditd.max_log_file }}" 
+
+- name: Action on nearly full audit logs
+  lineinfile: name="/etc/audit/auditd.conf" regexp="^space_left_action =" line="space_left_action = {{ auditd.space_left_action }}"
+
+- name: Mail account for auditd
+  lineinfile: name="/etc/audit/auditd.conf" regexp="^action_mail_acct =" line="action_mail_acct = {{ auditd.action_mail_acct }}"
+
+- name: Action on full audit logs
+  lineinfile: name="/etc/audit/auditd.conf" regexp="^admin_space_left_action =" line="admin_space_left_action = {{ auditd.admin_space_left_action }}"
+
+- name: Delete previous rules
+  copy: src="delete.rules" dest="/etc/audit/rules.d/00-delete.rules" owner="root" group="root" mode=0600
+
+- name: Add rules for date and time modifications
+  copy: src="datetime.rules" dest="/etc/audit/rules.d/10-datetime.rules" owner="root" group="root" mode=0600
+
+- name: Add rules to collect events that modify user and group information
+  copy: src="usergroup.rules" dest="/etc/audit/rules.d/10-usergroup.rules" owner="root" group="root" mode=0600
+
+- name: Add rules to monitor changes in the network environment (RHEL)
+  copy: src="rhelnetwork.rules" dest="/etc/audit/rules.d/10-network.rules" owner="root" group="root" mode=0600
+  when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+
+- name: Add rules to monitor changes in the network environment (Deb)
+  copy: src="debnetwork.rules" dest="/etc/audit/rules.d/10-network.rules" owner="root" group="root" mode=0600
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+
+- name: Stat selinux
+  stat: path="/etc/selinux"
+  register: selinux
+
+- name: Stat apparmor
+  stat: path="/etc/apparmor"
+  register: apparmor
+
+- name: Add rules that collect modifications in the system's Mandatory Access Controls (SELinux)
+  copy: src="macselinux.rules" dest="/etc/audit/rules.d/10-mac.rules" owner="root" group="root" mode=0600
+  when: selinux.stat.isdir is defined and selinux.stat.isdir
+
+- name: Add rules that collect modifications in the system's Mandatory Access Controls (Apparmor)
+  copy: src="macapparmor.rules" dest="/etc/audit/rules.d/10-mac.rules" owner="root" group="root" mode=0600
+  when: apparmor.stat.isdir is defined and apparmor.stat.isdir
+
+- name: Add rules that collect login and logout events
+  copy: src="loginlogout.rules" dest="/etc/audit/rules.d/10-loginlogout.rules" owner="root" group="root" mode=0600
+
+- name: Add rules that collect session initiation information
+  copy: src="session.rules" dest="/etc/audit/rules.d/10-session.rules" owner="root" group="root" mode=0600
+
+- name: Add rules that collect access control permission modifications
+  copy: src="access.rules" dest="/etc/audit/rules.d/10-access.rules" owner="root" group="root" mode=0600
+
+- name: Add rules that collect events about unsuccessful unauthorized file access attempts
+  copy: src="fileaccess.rules" dest="/etc/audit/rules.d/10-fileaccess.rules" owner="root" group="root" mode=0600
+
+- name: Add rules to collect use of privileged commands (requires initial configuration)
+  copy: src="privileged.rules" dest="/etc/audit/rules.d/10-privileged.rules" owner="root" group="root" mode=0600
+
+- name: Add rules to collect file system mounts
+  copy: src="mounts.rules" dest="/etc/audit/rules.d/10-mounts.rules" owner="root" group="root" mode=0600
+
+- name: Add rules about file deletions by users
+  copy: src="deletions.rules" dest="/etc/audit/rules.d/10-deletions.rules" owner="root" group="root" mode=0600
+
+- name: Add rules to collect changes in adminscope, namely sudoers
+  copy: src="adminscope.rules" dest="/etc/audit/rules.d/10-adminscope.rules" owner="root" group="root" mode=0600
+
+- name: Add rules to collect system administrator actions, namely sudolog
+  copy: src="sudolog.rules" dest="/etc/audit/rules.d/10-sudolog.rules" owner="root" group="root" mode=0600
+
+- name: Add rules to collect kernel module loading and unloading events
+  copy: src="module.rules" dest="/etc/audit/rules.d/10-module.rules" owner="root" group="root" mode=0600
+
+- name: Set system audit rules to be immutable
+  copy: src="immutable.rules" dest="/etc/audit/rules.d/99-immutable.rules" owner="root" group="root" mode=0600
+
+- name: Enable auditd
+  service: name=auditd enabled=yes
+
+- name: Generate rules
+  command: augenrules --load
+  when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+
+- name: Restart auditd (workaround for Centos 7, where systemctl doesn't allow restarting)
+  command: service auditd restart
