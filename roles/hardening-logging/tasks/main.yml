@@ -1,12 +1,10 @@
 ---
 
-- name: Install auditd
-  package: name=audit state=latest
-  when: ansible_distribution == 'CentOS' or ansible_distribution == 'Red Hat Enterprise Linux'
+- name: Include OS specific variables
+  include_vars: "{{ ansible_os_family }}.yml"
 
 - name: Install auditd
-  package: name=auditd state=latest
-  when: ansible_distribution == 'Debian' or ansible_distribution == 'Ubuntu'
+  package: name="{{ audit_package }}" state=latest
 
 - name: Log file size
   lineinfile: name="/etc/audit/auditd.conf" regexp="^max_log_file = \d" line="max_log_file = {{ auditd.max_log_file }}" 
